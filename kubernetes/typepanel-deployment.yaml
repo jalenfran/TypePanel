@@ -18,7 +18,11 @@ spec:
       containers:
         - name: typepanel
           # Image hosted in GHCR, built from this repo
-          image: ghcr.io/jalenfran/typepanel:latest
+          image: ghcr.io/jalenfran/typepanel@sha256:ec3c68bd945193ea114e7ad1b3fbb16f957a075e056ccefa703561692315bd71
+          # Digest-pinned 2026-10-03 (the digest then running and verified).
+          # :latest implies imagePullPolicy Always, which makes every pod restart
+          # depend on the registry still serving that tag -- MinIO stopped doing
+          # so and took aperture.jalencode.com down. Upgrade by changing the digest.
           imagePullPolicy: IfNotPresent
           env:
             - name: PORT
