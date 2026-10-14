@@ -18,8 +18,8 @@ spec:
       containers:
         - name: typepanel
           # Image hosted in GHCR, built from this repo
-          image: ghcr.io/jalenfran/typepanel@sha256:ec3c68bd945193ea114e7ad1b3fbb16f957a075e056ccefa703561692315bd71
-          # Digest-pinned 2026-10-03 (the digest then running and verified).
+          image: ghcr.io/jalenfran/typepanel@sha256:64401cc732032eb1aed40e1716d6fbef7fd3bc30d2220fc5acdd16ccd481dd22
+          # Digest-pinned 2026-10-13: Rust Yjs relay (the 10-03 pin was still the pre-Rust Node server).
           # :latest implies imagePullPolicy Always, which makes every pod restart
           # depend on the registry still serving that tag -- MinIO stopped doing
           # so and took aperture.jalencode.com down. Upgrade by changing the digest.

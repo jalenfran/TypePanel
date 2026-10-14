@@ -110,6 +110,20 @@ pub async fn handle_socket(
         }
     }
 
+    // We don't track awareness, so ask existing peers to rebroadcast theirs;
+    // otherwise the newcomer only learns about them on their ~15s renewal.
+    {
+        let mut encoder = EncoderV1::new();
+        YMessage::AwarenessQuery.encode(&mut encoder);
+        let payload = encoder.to_vec();
+        let clients = room.clients.lock().await;
+        for (cid, tx) in clients.iter() {
+            if *cid != client_id {
+                let _ = tx.try_send(payload.clone());
+            }
+        }
+    }
+
     let mut tokens: f64 = RATE_LIMIT_BURST;
     let mut last_refill = Instant::now();
     let mut bad_frames: u32 = 0;
@@ -131,8 +145,11 @@ pub async fn handle_socket(
         let elapsed = now.duration_since(last_refill).as_secs_f64();
         tokens = (tokens + elapsed * RATE_LIMIT_MSG_PER_SEC).min(RATE_LIMIT_BURST);
         last_refill = now;
+        // Dropping a frame would silently lose an edit the client has already
+        // applied locally; disconnect instead so y-websocket reconnects and resyncs.
         if tokens < 1.0 {
-            continue;
+            tracing::warn!(%peer, room=%room_id, client=%client_id, "rate limit exceeded");
+            break;
         }
         tokens -= 1.0;
 
@@ -247,13 +264,11 @@ async fn process_frame(frame: &[u8], room: &Arc<Room>, sender: ClientId) -> Resu
 
     if let Some(enc) = broadcast_encoder {
         let payload = enc.to_vec();
-        let clients = room.clients.lock().await;
-        for (cid, tx) in clients.iter() {
-            if *cid == sender {
-                continue;
-            }
-            let _ = tx.try_send(payload.clone());
-        }
+        let mut clients = room.clients.lock().await;
+        // A peer whose queue is full would miss this update for good. Drop its
+        // sender instead: the writer task closes the socket and the client
+        // reconnects with a fresh SyncStep1/2 exchange.
+        clients.retain(|cid, tx| *cid == sender || tx.try_send(payload.clone()).is_ok());
     }
 
     Ok(())
